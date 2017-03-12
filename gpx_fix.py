@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#@author: andrzej.religa@gmail.com
+#@author: areliga@o2.pl
 
 import xml.etree.ElementTree as ET
 import datetime
@@ -40,7 +40,7 @@ class GpxFileManipulator:
         points = list(xml_segm.iter(self._XML_TAG_POINT))
         for point_idx in range(0, len(points)): 
             xml_point = points[point_idx]
-            time=list(xml_point.iter(self._XML_TAG_TIME))
+            time = list(xml_point.iter(self._XML_TAG_TIME))
             assert(len(time)==1)
             cur_time = datetime.datetime.strptime(time[0].text, self._XML_TIME_FORMAT)
             if None != prev_time:
@@ -136,19 +136,21 @@ def inputParams(argv):
     if (len(argv) > 3): thresh_gap=int(argv[3])
     return op, in_filename, thresh_gap
     
+def main(args):
+    # 1) Get input params:
+    op, in_filename, thresh_gap = inputParams(args)
 
-# 1) Get input params:
-op, in_filename, thresh_gap = inputParams(sys.argv)
+    # 2) Create Main class instance:
+    gpxManip = GpxFileManipulator(in_filename)
 
-# 2) Create Main calss instance:
-gpxManip = GpxFileManipulator(in_filename)
+    # 3) Perform requested operation:
+    if (Operation.REMOVE_GAPS == op):
+        gpxManip.removeGapsXml(thresh_gap)
+    elif (Operation.ADD_TIMESTAMPS == op):
+        gpxManip.addTimestamps(thresh_gap)
 
-# 3) Perform requested operation:
-if (Operation.REMOVE_GAPS == op):
-    gpxManip.removeGapsXml(thresh_gap)
-elif (Operation.ADD_TIMESTAMPS == op):
-    gpxManip.addTimestamps(thresh_gap)
+    # 4) Save fixed file:
+    gpxManip.saveOutputFile()
 
-# 4) Save fixed file:
-gpxManip.saveOutputFile()
 
+if __name__ == "__main__": main(sys.argv)
