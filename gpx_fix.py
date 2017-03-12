@@ -70,7 +70,7 @@ class GpxFileManipulator:
         
         if None==thresh_gap: thresh_gap=self._DEFAULT_THRESH_GAP
         
-        print ("Fixing file >>%s<<, removing gaps greater than %d seconds." %(self.in_filename, thresh_gap))
+        print("Fixing file >>{}<<, removing gaps greater than {} seconds.".format(self.in_filename, thresh_gap))
                 
         total_gap_count=0
         total_gap_duration=0
@@ -82,12 +82,12 @@ class GpxFileManipulator:
                 total_gap_count += gap_count
                 total_gap_duration += gap_duration
                     
-        print ("Total gaps removed: %d - %d seconds."  % (total_gap_count, total_gap_duration))
+        print ("Number of gaps removed: {},  {} seconds.".format(total_gap_count, total_gap_duration))
     
     
     def addTimestamps(self, gap_seconds):
         if None==gap_seconds: gap_seconds=self._DEFAULT_GAP
-        print ("Fixing file >>%s<<, adding timestamps."  % in_filename)
+        print ("Fixing file >>{}<<, adding timestamps.".format(self.in_filename))
         timestamp = datetime.datetime.now() - datetime.timedelta(days=1)
         result = 0
         for xml_point in self.xml_root.iter(self._XML_TAG_POINT):
@@ -96,12 +96,12 @@ class GpxFileManipulator:
             timestamp += datetime.timedelta(seconds=gap_seconds)
             result+=1
             
-        print ("Added timestamps to %d points." % result)
+        print ("Added timestamps to {} points.".format(result))
     
     
     def saveOutputFile(self):
         
-        print ("Saving fixed file as >>%s<<." % self.out_filename)
+        print ("Saving fixed file as >>{}<<.".format(self.out_filename))
         self.tree.write(self.out_filename, xml_declaration=True)
         
 class Operation:
@@ -124,7 +124,7 @@ class Operation:
         
 def usageQuit(name):
     sys.exit("Required params not given!\n"
-             "Usage:\n%s rg|at gpx_filename [threshold_gap]" % name )
+             "Usage:\n{} rg|at gpx_filename [threshold_gap]".format(name ))
     
 def inputParams(argv):
     # Input params:
