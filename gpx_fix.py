@@ -15,7 +15,7 @@ class GpxFileManipulator:
     _XML_TIME_FORMAT="%Y-%m-%dT%H:%M:%S.000Z"
 
     def __init__(self, in_filename):
-        # Read and parse gpx file.
+        # Read and parse inpu gpx file.
         ET.register_namespace('', self._XML_NS)
         self.tree = ET.parse(in_filename)
         self.xml_root = self.tree.getroot()
@@ -32,9 +32,11 @@ class GpxFileManipulator:
         to that segment. The timestamp of the first point in the newly created segment
         is the timestamp of the last point before the gap, all the remaining points
         are adjusted respectively. This way the gap is removed.
+
+        Returns number of the gaps removed and total duration of all removed gaps (in seconds).
         """
-        segm_gap_count=0 #number of gaps removed from the segment
-        segm_gap_duration=0 #total duration of all gaps removed from the segment
+        segm_gap_count = 0 #number of gaps removed from the segment
+        segm_gap_duration = 0 #total duration of all gaps removed from the segment
 
         prev_time = None
         points = list(xml_segm.iter(self._XML_TAG_POINT))
@@ -48,17 +50,15 @@ class GpxFileManipulator:
             if None != prev_time:
                 cur_gap = (cur_time - prev_time).seconds
                 if cur_gap > thresh_gap:
-                    # the time gap since the previous point is greater than the threshold
-                    # let's remove it
+                    # The time gap since the previous point is greater than the threshold.
+                    # Let's remove it.
                     segm_gap_duration += cur_gap
                     segm_gap_count += 1
+                    # Move remaining points to a new segment.
                     xml_segm_new = ET.SubElement(xml_track, self._XML_TAG_SEGM)
-                    # Move all remaining track points to new segment element
-                    for i in range(point_idx, len(points)):
-                        xml_segm_new.append(points[i])
-                        xml_segm.remove(points[i])
-
-                    # Recursive call for all remaining track points moved to the new segment
+                    xml_segm_new.extend(points[point_idx:])
+                    del xml_segm[point_idx:]
+                    # Recursive call for all remaining track points moved to the new segment.
                     gap_count, gap_duration = self._removeGapsSegm(xml_track, xml_segm_new, thresh_gap)
                     segm_gap_count += gap_count
                     segm_gap_duration += gap_duration
@@ -70,40 +70,34 @@ class GpxFileManipulator:
 
 
     def removeGapsXml(self, thresh_gap):
-        print("Fixing file >>{}<<, removing gaps greater than {} seconds.".format(self.in_filename, thresh_gap))
-
-        total_gap_count=0
-        total_gap_duration=0
-        xml_tracks = list(self.xml_root.iter(self._XML_TAG_TRACK))
-        for xml_track in xml_tracks:
-            xml_segments = list(xml_track.iter(self._XML_TAG_SEGM))
-            for xml_segm in xml_segments:
+        total_gap_count = 0
+        total_gap_duration = 0
+        for xml_track in self.xml_root.iter(self._XML_TAG_TRACK):
+            for xml_segm in xml_track.iter(self._XML_TAG_SEGM):
                 gap_count, gap_duration = self._removeGapsSegm(xml_track, xml_segm, thresh_gap)
                 total_gap_count += gap_count
                 total_gap_duration += gap_duration
 
-        print ("Number of gaps removed: {},  {} seconds.".format(total_gap_count, total_gap_duration))
+        return total_gap_count, total_gap_duration
 
 
     def addTimestamps(self, gap_seconds):
-        print ("Fixing file >>{}<<, adding timestamps.".format(self.in_filename))
         timestamp = datetime.datetime.now() - datetime.timedelta(days=1)
-        result = 0
+        num_points = 0
         for xml_point in self.xml_root.iter(self._XML_TAG_POINT):
             xml_ts = ET.SubElement(xml_point, self._XML_TAG_TIME)
             xml_ts.text = timestamp.strftime(self._XML_TIME_FORMAT)
             timestamp += datetime.timedelta(seconds=gap_seconds)
-            result+=1
+            num_points += 1
 
-        print ("Added timestamps to {} points.".format(result))
+        return num_points
 
 
     def saveOutputFile(self):
-
-        print ("Saving fixed file as >>{}<<.".format(self.out_filename))
         self.tree.write(self.out_filename, xml_declaration=True)
+        return self.out_filename
 
-def main():
+def parseInputParams():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("input_file",
@@ -121,27 +115,32 @@ def main():
                         default = 15,
                         help = "Gap duration (in seconds) to use for the operation")
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    input_file, operation, gap = args.input_file, args.operation, args.gap
+def main():
+    args = parseInputParams()
 
     # Create Main class instance:
-    gpxManip = GpxFileManipulator(input_file)
+    gpxManip = GpxFileManipulator(args.input_file)
 
     # Perform requested operation:
-    if (operation == "remove-gaps"):
-        gpxManip.removeGapsXml(gap)
-    elif (operation == "add-timestamp"):
-        gpxManip.addTimestamps(gap)
+    if (args.operation == "remove-gaps"):
+        print("Fixing file >>{}<<, removing gaps greater than {} seconds.".format(args.input_file, args.gap))
+        gap_count, gap_duration = gpxManip.removeGapsXml(args.gap)
+        print ("Number of gaps removed: {},  {} seconds.".format(gap_count, gap_duration))
+    elif (args.operation == "add-timestamp"):
+        print ("Fixing file >>{}<<, adding timestamps every {} seconds.".format(args.input_file, args.gap))
+        num_points = gpxManip.addTimestamps(args.gap)
+        print ("Added timestamps to {} points.".format(num_points))
     else:
-        assert(False) # is args parser broken?
+        assert(False) # not likely, is args parser broken?
 
     # Save output file:
-    gpxManip.saveOutputFile()
+    out_file = gpxManip.saveOutputFile()
+    print ("Saving fixed file as >>{}<<.".format(out_file))
 
 
 if __name__ == "__main__": main()
-
 
 # TODO: logger
 # TODO: tests
