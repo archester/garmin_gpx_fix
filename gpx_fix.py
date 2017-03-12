@@ -24,22 +24,34 @@ class GpxFileManipulator:
         self.out_filename = os.path.join(head, "fixed_" + tail)
         self.in_filename = in_filename
 
-    def _removeGapsSegm(self, xml_track, xml_segm, thresh_gap):
-        prev_time = None
-        segm_gap_duration=0
-        segm_gap_count=0
 
+    def _removeGapsSegm(self, xml_track, xml_segm, thresh_gap):
+        """
+        Find all the gaps in the given gpx segment.
+        For each gap found creates a new segment and moves all the remaining points
+        to that segment. The timestamp of the first point in the newly created segment
+        is the timestamp of the last point before the gap, all the remaining points
+        are adjusted respectively. This way the gap is removed.
+        """
+        segm_gap_count=0 #number of gaps removed from the segment
+        segm_gap_duration=0 #total duration of all gaps removed from the segment
+
+        prev_time = None
         points = list(xml_segm.iter(self._XML_TAG_POINT))
-        for point_idx in range(0, len(points)):
-            xml_point = points[point_idx]
+        for point_idx, xml_point in enumerate(points):
             time = list(xml_point.iter(self._XML_TAG_TIME))
-            assert(len(time)==1)
+            if len(time) != 1:
+                raise ValueError("Invalid gpx file structure, invalid number of time tags for the point. "
+                                 "Expected {}, found {}".format(1, len(time)))
+
             cur_time = datetime.datetime.strptime(time[0].text, self._XML_TIME_FORMAT)
             if None != prev_time:
                 cur_gap = (cur_time - prev_time).seconds
                 if cur_gap > thresh_gap:
+                    # the time gap since the previous point is greater than the threshold
+                    # let's remove it
                     segm_gap_duration += cur_gap
-                    segm_gap_count+=1
+                    segm_gap_count += 1
                     xml_segm_new = ET.SubElement(xml_track, self._XML_TAG_SEGM)
                     # Move all remaining track points to new segment element
                     for i in range(point_idx, len(points)):
@@ -48,8 +60,8 @@ class GpxFileManipulator:
 
                     # Recursive call for all remaining track points moved to the new segment
                     gap_count, gap_duration = self._removeGapsSegm(xml_track, xml_segm_new, thresh_gap)
-                    segm_gap_count+=gap_count
-                    segm_gap_duration+=gap_duration
+                    segm_gap_count += gap_count
+                    segm_gap_duration += gap_duration
                     # Important to quit "for" loop as points list for the segment is no longer valid
                     break
             prev_time = cur_time
